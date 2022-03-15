@@ -1,0 +1,117 @@
+---
+title: "Project 2 Group 4"
+author: "Manasvi Mittal"
+date: "12/10/2021"
+output: pdf_document
+---
+
+### Apple Stock Tweets Analysis
+## Data Collection
+Following libraries were used in this project:
+```{r echo = FALSE}
+library(quantmod)
+library(tidyquant)
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tm)
+library(tidytext)
+library(tokenizers)
+library(stopwords)
+library(ggplot2)
+library(ClusterR)
+library(cluster)
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2)
+```
+
+There were two datasets taken for this project. The Apple stocks data was taken from yahoo API using the following code:
+```{r}
+get_market_data <- function() {
+  getSymbols("AAPL", src = "yahoo")
+  return(AAPL)
+}
+
+aapl <- get_market_data()
+```
+
+The other data set is the Stocks Tweet data that was taken from Kaggle and was cleaned according to our purpose later. 
+```{r}
+tweets <- read.csv("tweets/Tweet.csv")
+# We uplaoded the .csv that we cleaned so that we dont have to clean the data multiple times
+tweets_cleaned <- read.csv("aapl_tweets_cleaned.csv")
+```
+
+## Data Cleaning
+For our purpose, there were a few steps that we needed to take in order to get the most accurate results. 
+
+# Discovering
+The tweets data consisted of the following variables. Here the post data is in EPOCH seconds. 
+```{r}
+colnames(tweets)
+```
+
+#Structuring
+For our purpose, we selected the "body" of the data which consisted of the tweets. As you can see, there is alot of characters and data in the tweets that is not required, we clean it all in the next step. 
+```{r}
+head(tweets$body)
+```
+
+#Cleaning
+We needed to clean the data and remove all the unnecessary components in the data that would have resulted in an inaccurate result for clustering and the business questions. 
+
+Here, we are selecting and filtering the tweets that contain the ticket symbol "$AAPL" in the Tweet body.
+```{r}
+tweets %>%
+  filter(grepl('$AAPL', body,fixed = TRUE)) -> aapl_tweets
+aapl_tweets <- data.frame(unique(aapl_tweets$body))
+```
+
+Since many tweets contain links to external articles, we are removing "http" and "https" that might hamper the clustering process.
+```{r}
+aapl_tweets$unique.aapl_tweets.body. <- gsub("http.*", "", aapl_tweets$unique.aapl_tweets.body.)
+aapl_tweets$unique.aapl_tweets.body. <- gsub("https.*", "", aapl_tweets$unique.aapl_tweets.body.)
+
+head(aapl_tweets)
+```
+
+
+Converting all the characters in the tweet body to lower case and removing punctuation to maintain consistency 
+```{r}
+aapl_tweets$unique.aapl_tweets.body. <- tolower(aapl_tweets$unique.aapl_tweets.body.)
+aapl_tweets$unique.aapl_tweets.body. <- removePunctuation(aapl_tweets$unique.aapl_tweets.body.)
+
+head(aapl_tweets)
+```
+
+Here we are, removing non-alphanumeric characters that might be irrelevant
+```{r}
+aapl_tweets$unique.aapl_tweets.body. <- str_replace_all(aapl_tweets$unique.aapl_tweets.body., "[^[:alnum:]]", " ")
+
+head(aapl_tweets)
+```
+
+# Enriching
+Here, we remove the stop words such as "the", "a", "to", "in", etc., which are not relevant for the clustering and the data of $AAPL.
+```{r}
+stopwords_regex <- paste(stopwords('en'), collapse = '\\b|\\b')
+stopwords_regex <- paste0('\\b', stopwords_regex, '\\b')
+aapl_tweets$unique.aapl_tweets.body. <- str_replace_all(aapl_tweets$unique.aapl_tweets.body., stopwords_regex, '')
+
+head(aapl_tweets)
+```
+
+# Obtain sentiment of the Tweet based on the positive and the negative words that is being read
+```{r}
+tweet_sentiment <- get_sentiments(aapl_tweets$unique.aapl_tweets.body.)
+```
+
+# Drop N/A and NULL values
+```{r}
+aapl_tweets <- aapl_tweets %>%
+  drop_na()
+```
+
+
+

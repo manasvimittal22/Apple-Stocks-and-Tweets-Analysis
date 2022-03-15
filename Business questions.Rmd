@@ -1,0 +1,215 @@
+---
+title: "Business analysis"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+Business Problem : The business question are from the perspective of a investment firm looking to invest in the stock of Apple inc.
+
+libraries required
+```{r}
+library(forecast)
+library(zoo)
+library(fBasics)
+library(rugarch)
+library(ggplot2)
+library(plotly)
+```
+
+
+# Probablity questions
+
+## Question 1 : Lets understand the previous price trends of the Apple inc ticker?  
+
+```{r}
+#reading the dataset
+apple_price <- read.csv("AAPL.csv")
+
+apple_price$Date <- as.Date(apple_price$Date,"%m/%d/%Y")
+
+#subsetting data according to relevant dates
+apple_price_relevant_before <- apple_price[apple_price$Date > "2014-12-31" & apple_price$Date < "2020-12-31" , ]
+
+
+#creating a timely ordered data set to perform time series regression
+apple_price_relevant = zoo(apple_price_relevant_before$Close, apple_price_relevant_before$Date)
+head(apple_price_relevant)
+
+#The apple stock price between the
+par(mfrow=c(1,1))
+plot(apple_price_relevant, type='l', ylab = "Closing Price", xlab = '2015-2020' , main=" Apple stock price over the years")
+```
+#Conclusion : 
+As you can see from the above representation the apple stock price has historically compounded over the years. Historically apple stock have given an compounded annual return of around 33%. The stock had fallen recently due to the corona crisis to $55 in March of 2019 and recovered to the new high levels of 130's by December of 2020. This is the summary of the Apple stock price over the years.    
+
+
+
+## Question 2 : How have the daily returns of Apple's stock been between 2015-2020? 
+
+```{r}
+#to calculate abs returns for each day
+returns = 1- (apple_price_relevant/lag(apple_price_relevant, -1))
+
+h <- hist(returns, breaks = 20, plot=FALSE)
+h$counts=h$counts/sum(h$counts)
+plot(h,xlab='Returns',ylab="Probablity")
+```
+
+```{r}
+#displaying the absolute returns over the years
+par(mfrow=c(1,1))
+a <- plot(returns, type='l', ylab = "Returns", main="Perentage returns of apple stock daily over the years")
+
+```
+
+## Conclusion : 
+The graph above gives us the probability distribution of daily returns given by Apple Inc stock between the years 2015 and 2020. Above distribution shows that that Apple stock is not a highly volatile stock with almost 50 percent of all the daily returns lying in between -1% / +1% range. 
+
+
+## Question 3 : Can a long/short position in apple stock generate more than a 5% return in day(considering absolute returns)?
+
+```{r}
+print(quantile(returns,1:80/80))
+```
+```{r}
+po <- ggplot(data = returns, aes(x=returns))
+po +stat_ecdf()
+```
+
+## Conclusion : 
+As you can see for the above return cdf and percentile data, historically about 1.25% of the times the stock has fallen more than 5% between adjacent days closing and about 1% of the time the stock price has increased more than 5% between adjacent days closing. This shows us that the probability of apple stock generating returns greater than 5 percent given a long/short position (if returns are in absolute investment amounts without leverage) is less than 2.5%. This means the apple stock barely reacts drastically to the market conditions/news and hence you have a very less probability of making more than five percent in a given day, by trading Apple stock. 
+
+
+# Time series Analysis  
+
+## Question 4 : 
+Can we make a strategy based on the volatility of the stock based on previous stock price data? 
+
+```{r}
+# creates time plot of log returns
+returns_log = log(apple_price_relevant/lag(apple_price_relevant, -1))
+
+egarch11.t.spec=ugarchspec(variance.model=list(model = "eGARCH", garchOrder=c(1,1)), mean.model=list(armaOrder=c(0,0)), distribution.model = "std")
+#estimate model 
+egarch11.t.fit=ugarchfit(spec=egarch11.t.spec, data=returns_log)
+#plot(egarch11.t.fit)
+#12
+```
+
+
+# Conclusion : 
+While trying to find out the variation of price change percentage while performing time series prediction using GARCH model. We found out that the volatility of percentage price change is much higher when the price is falling as compared to the volatility of percentage price change when the price is increasing. Using this nature of the ticker we can use strategies which make profit based on the volatility of the stock price. The trader goes both long and short on a stock at the same time creating a band on both the positive and negative side of the current price  within which the trader is at loss. Whenever the ticker exceeds the price the trader will earn a profit. This News Impact curve helps us understand that this can likely be done in case of the apple stock when the price starts falling as the price volatility of the stock drastically increases.
+
+
+## Question 5 :
+Continuing on the above question can we find a model to predict the volatility of the stock price to build our investment models?
+
+```{r}
+
+rff=ugarchfit(spec=egarch11.t.spec, data=returns_log, out.sample=500)
+rf=ugarchforecast(rff, n.ahead=20, n.roll=450)
+#plot(rf)
+
+```
+
+
+# Conclusion : 
+We were able to adequately predict the volatility or the sigma of the stock price with adequate effect. This model can be fine tuned with better data sets of stock prices with each transaction being reflected in the data set instead of just daily data. These kind of datasets are hard to access and need to be bought from brokers on whose exchange the transactions are taking place and hence, they are very expensive. The regression model looks adequate in predicting volatility given our data sets. 
+
+
+#### Text analysis and clustering ##question
+
+## Question 6: Is the market price of Apple stock related to the sentiment of that stock amongst inverstors? (we will use twitte'rs tweet data to find out the sentiment of the stock amongst investors)
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(stringr)
+library(tm)
+library(tidytext)
+library(tokenizers)
+library(stopwords)
+require(plyr)
+library(syuzhet)
+library(wordcloud)
+library(factoextra)
+library(lubridate)
+library(cluster)
+library(fpc)
+aapl_tweets <- read_csv("aapl_tweets_cleaned.csv")
+# Obtain sentiment of the Tweet based on the positive and the negative words that is being read
+aapl_tweets$unique.aapl_tweets.body. <- str_replace_all(aapl_tweets$unique.aapl_tweets.body.,"[^[:graph:]]", " ") 
+tweet_sentiment <- get_sentiment(aapl_tweets$unique.aapl_tweets.body.)
+# Drop N/A and NULL values
+aapl_tweets <- aapl_tweets %>%
+  drop_na()
+# Histogram of sentiment of tweets
+neutral <- length(which(tweet_sentiment == 0))
+positive <- length(which(tweet_sentiment > 1))
+negative <- length(which(tweet_sentiment < 0))
+Sentiment <- c("Positive","Neutral","Negative")
+Count <- c(positive,neutral,negative)
+output <- data.frame(Sentiment,Count)
+output$Sentiment<-factor(output$Sentiment,levels=Sentiment)
+output_plot <- ggplot(output, aes(x=Sentiment,y=Count))+
+  geom_bar(stat = "identity", aes(fill = Sentiment))+
+  ggtitle("Barplot of Sentiment type of $AAPL tweets")
+
+output_plot
+```
+
+# Conclusion :
+As shown by our results for all the years above. We can see that the sentiment for the apple stock does not reflect the apple stock price. The stock price of apple has increased more than three hundred percent over the years whereas the general sentiment of apple stock over the years has been largely negative or neutral based on our tweets data. Let us further study the relationship of market sentiment and share price to further establish the relationship between the both of them using an market events in the next question.  
+
+
+## Question 7: Can we make a clustering algorithm to determine the sentiment of the market based on tweets data to make an investment strategy based on the same?
+
+```{r}
+
+# Number of positive and negative tweets about $AAPL for the month of October, 2018
+tweets <- read.csv("tweets/Tweet.csv")
+october_data <- data.frame(post_date = tweets$post_date, tweet = tweets$body)
+october_data$post_date <- as_datetime(october_data$post_date)
+october_data$post_date <- format(october_data$post_date, "%Y-%m-%d")
+october_data$post_date <- as.Date(october_data$post_date)
+subset_dates <- interval(start = "2018-10-01", end = "2018-10-31")
+october_data <- october_data[which(october_data$post_date %within% subset_dates), ]
+october_data$sentiment <- get_sentiment(october_data$tweet)
+october_kmeans_sentiment <- kmeans(data.frame(october_data$sentiment), centers = 3, nstart = 20)
+cluster_plot <- plotcluster(october_data$sentiment, october_kmeans_sentiment$cluster)
+
+```
+# Conclusion :
+It can be noted that the clustering of tweets yield the following results:
+For the month of October 2018, our clustering model shows that the sentiment of the market was largely negative to neutral with over 66% of tweets in this range. The sentiment analysis model can be further used to make an investment strategy as our model's results for the market sentiment correlates with $AAPL's stock price during this time period. It can also be noted that the variance of the positive tweets is more when compared to the other two.
+
+## Question 8: What does the word cloud for the tweets based on $AAPL's stock look like?
+
+```{r}
+# Word Cloud
+#text_corpus <- Corpus(VectorSource(october_data$tweet))
+#tdm <- TermDocumentMatrix(text_corpus)
+#tdm <- as.matrix(tdm)
+#tdm <- sort(rowSums(tdm), decreasing = TRUE)
+#tdm <- data.frame(word = names(tdm), freq = tdm)
+#set.seed(123)
+#word_cloud <- wordcloud(text_corpus, min.freq = 1, max.words = 100, scale = c(2.2,1),
+#          colors=brewer.pal(8, "Dark2"), random.color = T, random.order = F)
+
+#word_cloud
+```
+
+#Conclusion :
+**Note**: The code above has been commented since we were facing memory constraint issues as this particular case requires a vector of 90.5GB to be allocated, which was not possible while knitting the file.
+However, you can run the above piece of code as a standalone *.R file and you will get the results as shown below.
+As we can see in the image, Apple's products such as iPhone, iPad are talked about at large.
+People also talk about the effect China has on Apple since they is known to hire a lot of cheap labor from China to assemble their products.
+Also, we can conclude from the wordcloud that the general consensus is to compare Apple's stock to other tech giants like Amazon($AMZN), Google($GOOG) and Microsoft($MSFT).
+
+
